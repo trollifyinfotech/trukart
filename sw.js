@@ -1,9 +1,9 @@
 /* sw.js - Veloura service worker: offline APP SHELL + public image cache.
    It NEVER caches Supabase REST/auth/function responses (those may be private). Catalogue data is cached by the
    app itself in IndexedDB (assets/js/cache.js). Bump VERSION when you change this file's behaviour. */
-const VERSION = 'v15';
+const VERSION = 'v16';
 const SHELL = 'veloura-shell-' + VERSION, IMG = 'veloura-img-' + VERSION;
-const SHELL_FILES = ['./', 'index.html', 'assets/css/styles.css', 'assets/js/icons.js', 'assets/js/core.js', 'assets/js/cache.js', 'assets/js/app.js', 'assets/js/storefront.js', 'assets/js/storefront_admin.js', 'assets/js/music_admin.js', 'assets/vendor/jszip.min.js', 'assets/js/xlsx-lite.js', 'assets/js/bulk.js', 'assets/js/music.js', 'assets/css/storefront.css', 'assets/js/shop.js', 'assets/js/payments.js', 'assets/js/shoppage.js', 'assets/js/account.js', 'assets/js/seller.js', 'assets/js/admin.js', 'supabase/supabase.js', 'assets/img/favicon.svg', 'assets/img/placeholder.svg'];
+const SHELL_FILES = ['./', 'index.html', 'assets/css/styles.css', 'assets/js/icons.js', 'assets/js/core.js', 'assets/js/cache.js', 'assets/js/app.js', 'assets/js/marketplace.js', 'assets/js/storefront.js', 'assets/js/storefront_admin.js', 'assets/js/music_admin.js', 'assets/js/marketplaces_admin.js', 'assets/vendor/jszip.min.js', 'assets/js/xlsx-lite.js', 'assets/js/bulk.js', 'assets/js/music.js', 'assets/css/storefront.css', 'assets/js/shop.js', 'assets/js/payments.js', 'assets/js/shoppage.js', 'assets/js/account.js', 'assets/js/seller.js', 'assets/js/admin.js', 'supabase/supabase.js', 'assets/img/favicon.svg', 'assets/img/placeholder.svg'];
 const CDN_LIBS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/dist/umd/supabase.min.js'];
 const MAX_IMAGES = 400, NET_TIMEOUT = 4000;
 

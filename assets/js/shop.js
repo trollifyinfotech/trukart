@@ -165,7 +165,7 @@
     L.addRecent('recent_view', data.id, 20); L.addRecent('recent_cats', data.category_id, 5); document.title = data.title;
     window.sb.rpc('record_product_view', { p_product: data.id }).then(() => {}, () => {}); window.sb.rpc('track_event', { p_event: 'product_view', p_product: data.id }).then(() => {}, () => {});
     let canReview = null; if (S.user && !Net.offline) { try { const { data: its } = await window.sb.from('order_items').select('id').eq('product_id', data.id).eq('fulfillment_status', 'delivered'); const { data: done } = await window.sb.from('product_reviews').select('id').eq('product_id', data.id).eq('user_id', S.user.id); if (its && its.length && !(done && done.length)) canReview = its[0].id; } catch (e) { canReview = null; } }
-    P.canReview = canReview;
+    P.canReview = canReview; P.mk = await Mkt.map();
     P.voted = new Set(); if (S.user && !Net.offline && P.reviews.length) { try { const { data: vs } = await window.sb.from('review_votes').select('review_id').in('review_id', P.reviews.map((x) => x.id)); P.voted = new Set((vs || []).map((x) => x.review_id)); } catch (e) { /* votes are optional */ } }
     const sim = (await fetchProducts({ cats: data.category_id ? [data.category_id] : null }, 0, 12)).items.filter((x) => x.id !== data.id); P.sim = sim; const rec = await byIds(L.rd('recent_view', []).filter((i) => i !== data.id).slice(0, 10));
     const rail = (t, a, href) => (a.length ? `<section class="sec"><div class="row between"><h2>${t}</h2>${href ? `<a class="arrowbtn" href="${href}" aria-label="See all">${icon('arrow-right', 18)}</a>` : ''}</div><div class="rail">${a.map(pcard).join('')}</div></section>` : '');
@@ -178,6 +178,7 @@
   const selVar = () => P.vars.find((v) => (P.sizes.length ? v.size === P.size : true) && (P.colors.length ? v.color === P.color : true)) || null;
   const rimg = (p) => (/^https?:/.test(p) ? p : window.sb.storage.from('review-images').getPublicUrl(p).data.publicUrl);
   const rvPill = (r) => `<span class="pill r${r}">${r} ${icon('star', 11, 'filled')}</span>`;
+  const mkLinks = (p) => { const ls = (Array.isArray(p.external_links) ? p.external_links : []).map((l) => Mkt.badge(l, P.mk)).filter(Boolean); return ls.length ? `<div class="mkts"><div class="mkh">Also available on</div><div class="mkr">${ls.join('')}</div><p class="mkd">Sponsored links. We may earn a commission when you buy there. The price and delivery there are decided by that store.</p></div>` : ''; };
   function drawPdp() {
     P.sizes = [...new Set(P.vars.map((v) => v.size).filter(Boolean))]; P.colors = [...new Set(P.vars.map((v) => v.color).filter(Boolean))];
     const p = P.p, v = selVar(), prices = P.vars.map((x) => Number(x.price_override || p.base_price)), price = v ? Number(v.price_override || p.base_price) : Math.min(Number(p.base_price), ...prices), onwards = !v && prices.some((x) => x !== price), pct = p.original_price > price ? Math.round((p.original_price - price) / p.original_price * 100) : 0, inStock = P.vars.some((x) => x.stock_quantity > 0), maxq = Math.min(S.settings.max_qty_per_item, v ? v.stock_quantity : 1);
@@ -192,6 +193,7 @@
       <div class="pinfo">
         <div class="ttl"><h1>${esc(p.title)}</h1><div class="ta"><button data-act="wishP" class="${wished ? 'on' : ''}" aria-pressed="${wished}">${icon('heart', 22, wished ? 'filled' : '')}<span>Wishlist</span></button><button data-act="shareP">${icon('share', 22)}<span>Share</span></button></div></div>
         <div class="pprice"><b>${inr(price)}</b>${onwards ? '<span class="onw">onwards</span>' : ''}${pct ? `<s>${inr(p.original_price)}</s><span class="dn">↓${pct}% off</span>` : ''}</div><p class="ok small" style="margin:2px 0 0">Inclusive of all taxes${p.tax_rate ? ' (GST ' + Number(p.tax_rate) + '%)' : ''}</p>
+        ${mkLinks(p)}
         ${rt ? `<div class="rrow"><span class="pill r${Math.round(rt.avg_rating)}">${rt.avg_rating} ${icon('star', 12, 'filled')}</span><span class="muted small">${rt.review_count} Rating${rt.review_count > 1 ? 's' : ''} &amp; Review${rt.review_count > 1 ? 's' : ''}</span></div>` : ''}
         ${v && v.stock_quantity > 0 && v.stock_quantity <= 5 ? `<p class="err" style="margin:8px 0 0"><b>Only ${v.stock_quantity} left!</b></p>` : ''}${!inStock ? '<p class="err" style="margin:8px 0 0"><b>Currently out of stock</b></p>' : ''}
         <div style="margin-top:14px">${sizes}${colors}</div>

@@ -24,17 +24,18 @@
 
   /* ---------- template ---------- */
   const catLabels = (cats) => { const byId = new Map(cats.map((c) => [c.id, c])), path = (c) => (c.parent_id && byId.get(c.parent_id) ? path(byId.get(c.parent_id)) + ' › ' : '') + c.name; return cats.map((c) => ({ id: c.id, label: path(c), slug: c.slug, name: c.name })).sort((a, b) => a.label.localeCompare(b.label)); };
-  function columnsFor(t) {
+  function columnsFor(t, mks) {
     const c = [['code', 'Product Code', 16, false], ['title', 'Title', 40, true], ['brand', 'Brand', 18, false], ['category', 'Category', 34, true], ['description', 'Description', 55, false], ['mrp', 'MRP (₹)', 12, true], ['price', 'Selling Price (₹)', 16, true], ['gst', 'GST %', 9, false], ['material', 'Material / Fabric', 18, false], ['color', 'Colour', 14, false], ['returnable', 'Returnable (Yes/No)', 14, false]];
     if (t.sizes) t.sizes.forEach((s) => c.push(['stock:' + s, 'Stock - ' + s, 11, false])); else { c.push(['pack', 'Pack size / weight', 16, false]); c.push(['stock', 'Stock', 10, true]); }
     (t.specs || []).forEach((s) => c.push(['spec:' + s, s, 16, false])); if (t.care) c.push(['care', 'Care instructions', 28, false]);
+    (mks || []).forEach((m) => c.push(['mk:' + m.id, 'Link - ' + m.name, 30, false]));
     c.push(['img1', 'Image 1', 24, true], ['img2', 'Image 2', 24, false], ['img3', 'Image 3', 24, false]);
     return c.map(([k, h, w, req]) => ({ k, h, w, req }));
   }
-  function sheetFor(t, nCat) {
-    const cols = columnsFor(t), idx = (k) => cols.findIndex((c) => c.k === k), L = (k) => XlsxLite.colName(idx(k)), last = 501;
+  function sheetFor(t, nCat, mks) {
+    const cols = columnsFor(t, mks), idx = (k) => cols.findIndex((c) => c.k === k), L = (k) => XlsxLite.colName(idx(k)), last = 501;
     const head = cols.map((c) => ({ v: c.h + (c.req ? ' *' : ''), s: c.req ? 1 : 2 }));
-    const ex = cols.map((c) => { const e = t.ex, v = c.k === 'code' ? 'EXAMPLE-01' : c.k === 'title' ? 'EXAMPLE: ' + e.title : c.k === 'brand' ? 'Your Brand' : c.k === 'category' ? '(choose from the list)' : c.k === 'description' ? 'Write 2-4 lines about the product: fabric, fit, features.' : c.k === 'mrp' ? 999 : c.k === 'price' ? 599 : c.k === 'gst' ? 5 : c.k === 'material' ? e.mat : c.k === 'color' ? e.color : c.k === 'returnable' ? 'Yes' : c.k === 'pack' ? e.pack : c.k === 'stock' ? e.stock : c.k.startsWith('stock:') ? (e.stock[c.k.slice(6)] ?? '') : c.k.startsWith('spec:') ? (e.specs[c.k.slice(5)] || '') : c.k === 'care' ? 'Machine wash cold' : c.k === 'img1' ? 'example-front.jpg' : c.k === 'img2' ? 'example-back.jpg' : c.k === 'img3' ? 'example-side.jpg' : ''; return { v, s: 3 }; });
+    const ex = cols.map((c) => { const e = t.ex, v = c.k === 'code' ? 'EXAMPLE-01' : c.k === 'title' ? 'EXAMPLE: ' + e.title : c.k === 'brand' ? 'Your Brand' : c.k === 'category' ? '(choose from the list)' : c.k === 'description' ? 'Write 2-4 lines about the product: fabric, fit, features.' : c.k === 'mrp' ? 999 : c.k === 'price' ? 599 : c.k === 'gst' ? 5 : c.k === 'material' ? e.mat : c.k === 'color' ? e.color : c.k === 'returnable' ? 'Yes' : c.k === 'pack' ? e.pack : c.k === 'stock' ? e.stock : c.k.startsWith('stock:') ? (e.stock[c.k.slice(6)] ?? '') : c.k.startsWith('spec:') ? (e.specs[c.k.slice(5)] || '') : c.k === 'care' ? 'Machine wash cold' : c.k.startsWith('mk:') ? '' : c.k === 'img1' ? 'example-front.jpg' : c.k === 'img2' ? 'example-back.jpg' : c.k === 'img3' ? 'example-side.jpg' : ''; return { v, s: 3 }; });
     const v = [{ type: 'list', sqref: `${L('category')}2:${L('category')}${last}`, f1: `Categories!$A$2:$A$${Math.max(3, nCat + 1)}`, error: 'Pick a category from the list (see the Categories sheet).' }, { type: 'list', sqref: `${L('returnable')}2:${L('returnable')}${last}`, f1: `"${YN}"`, error: 'Type Yes or No.' }, { type: 'decimal', op: 'greaterThan', sqref: `${L('mrp')}2:${L('price')}${last}`, f1: '0', error: 'Enter a price greater than 0.' }, { type: 'decimal', op: 'between', sqref: `${L('gst')}2:${L('gst')}${last}`, f1: '0', f2: '28', error: 'GST must be between 0 and 28.' }];
     const sc = cols.filter((c) => c.k === 'stock' || c.k.startsWith('stock:')); if (sc.length) v.push({ type: 'whole', op: 'greaterThanOrEqual', sqref: `${L(sc[0].k)}2:${L(sc[sc.length - 1].k)}${last}`, f1: '0', error: 'Stock must be a whole number (0 or more). Leave blank if you do not sell this size.' });
     return { name: t.name.replace(/[\[\]:*?\/\\]/g, '').slice(0, 31), rows: [head, ex], widths: cols.map((c) => c.w), freeze: 1, heights: [34, 48], validations: v };
@@ -50,6 +51,7 @@
       '7. If the same product comes in another colour, add another row with the new colour and its own photos.',
       '8. PHOTOS: type the file name of each photo in Image 1, Image 2, Image 3 (for example kurti-red-front.jpg). Image 1 is required and is the main photo. Later, on the Bulk upload page, select all the photo files together - they are matched by file name.',
       '9. Photos: JPG, PNG or WebP. Big photos are reduced automatically.',
+      '9b. OTHER MARKETPLACES (optional): in the "Link - Amazon" / "Link - Flipkart" ... columns paste the product link of the same item on that marketplace (up to 4). Customers see that marketplace poster under the price. Links must start with https:// and belong to that marketplace.',
       '10. The yellow EXAMPLE row is skipped automatically - you can overwrite or delete it.',
       '11. Save the file as .xlsx (Excel / Google Sheets "Download as Excel") or as .csv for a single sheet, then upload it on the Bulk upload page.',
       `12. Up to ${MAX_ROWS} products in one upload. Products are first saved as drafts; you can choose to send them for review right away.`,
@@ -58,32 +60,34 @@
   }
   async function downloadTemplate(ids) {
     const types = TYPES.filter((t) => ids.includes(t.id)); if (!types.length) return toast('Select at least one product type', 'error');
-    const cats = catLabels(await getCats()); const blob = await XlsxLite.write([helpSheet(types), ...types.map((t) => sheetFor(t, cats.length)), { name: 'Categories', rows: [[{ v: 'Category (copy exactly)', s: 1 }], ...cats.map((c) => [c.label])], widths: [60], freeze: 1 }]);
+    const cats = catLabels(await getCats()), mks = await Mkt.list(); const blob = await XlsxLite.write([helpSheet(types), ...types.map((t) => sheetFor(t, cats.length, mks)), { name: 'Categories', rows: [[{ v: 'Category (copy exactly)', s: 1 }], ...cats.map((c) => [c.label])], widths: [60], freeze: 1 }]);
     save(blob, 'bulk-product-template.xlsx'); toast('Template downloaded - fill it in Excel or Google Sheets');
   }
   const save = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800); };
 
   /* ---------- reading + checking the filled sheet ---------- */
   const ALIASES = { code: ['product code', 'code', 'sku', 'item code'], title: ['title', 'product title', 'product name', 'name'], brand: ['brand', 'brand name'], category: ['category', 'category name'], description: ['description', 'details', 'product description'], mrp: ['mrp', 'original price', 'mrp rs', 'list price'], price: ['selling price', 'price', 'sale price', 'selling price rs'], gst: ['gst', 'gst rate', 'tax'], material: ['material fabric', 'material', 'fabric'], color: ['colour', 'color'], returnable: ['returnable yes no', 'returnable', 'returnable yes no '], care: ['care instructions', 'care'], pack: ['pack size weight', 'pack size', 'weight', 'pack'], stock: ['stock', 'quantity', 'qty'], img1: ['image 1', 'image1', 'photo 1', 'main image'], img2: ['image 2', 'image2', 'photo 2'], img3: ['image 3', 'image3', 'photo 3'] };
-  function mapHeaders(headerRow, t) {
+  function mapHeaders(headerRow, t, mks) {
     const map = {}; headerRow.forEach((h, i) => { const n = norm(h); if (!n) return; let key = null;
       for (const [k, al] of Object.entries(ALIASES)) if (al.map(norm).includes(n)) { key = k; break; }
       if (!key && /^stock /.test(n)) { const raw = String(h).replace(/^\s*stock\s*[-:–]?\s*/i, '').trim(); key = 'stock:' + (/^free/i.test(raw) ? 'Free Size' : raw.toUpperCase() === raw ? raw : raw); }
+      if (!key && /^link /.test(n)) { const rest = n.slice(5), m = (mks || []).find((x) => norm(x.name) === rest || x.id === rest); if (m) key = 'mk:' + m.id; }
       if (!key) { const sp = (t.specs || []).find((s) => norm(s) === n); if (sp) key = 'spec:' + sp; }
       if (key && !(key in map)) map[key] = i; });
     return map;
   }
   const num = (v) => { const s = String(v == null ? '' : v).replace(/[₹,\s]/g, '').replace(/^rs\.?/i, ''); if (s === '') return NaN; return Number(s); };
   const yn = (v) => { const s = norm(v); return s === '' ? true : ['yes', 'y', 'true', '1', 'haan', 'ha'].includes(s) ? true : ['no', 'n', 'false', '0', 'nahi', 'na'].includes(s) ? false : null; };
-  function parseSheets(sheets, csvType) {
+  function parseSheets(sheets, csvType, mks) {
     const out = []; const byName = new Map(TYPES.map((t) => [norm(t.name), t]));
     sheets.forEach((sh) => { let t = byName.get(norm(sh.name)); if (!t && sh.name === 'CSV') t = TYPES.find((x) => x.id === csvType) || TYPES[0]; if (!t) return;
       const hi = sh.rows.findIndex((r) => r.some((c) => ['title', 'product title', 'product name'].includes(norm(c)))); if (hi < 0) { out.push({ type: t, name: sh.name, rows: [], headError: 'Could not find the heading row (a column called Title).' }); return; }
-      const map = mapHeaders(sh.rows[hi], t), rows = [];
+      const map = mapHeaders(sh.rows[hi], t, mks), rows = [];
       sh.rows.slice(hi + 1).forEach((r, k) => { const get = (key) => (key in map ? String(r[map[key]] ?? '').trim() : ''); if (!r.some((c) => String(c || '').trim() !== '')) return; if (/^example/i.test(get('title'))) return;
         const stocks = {}; Object.keys(map).filter((k2) => k2.startsWith('stock:')).forEach((k2) => { const v = get(k2); if (v !== '') stocks[k2.slice(6)] = v; });
+        const links = {}; Object.keys(map).filter((k2) => k2.startsWith('mk:')).forEach((k2) => { const v = get(k2); if (v) links[k2.slice(3)] = v; });
         const specs = {}; Object.keys(map).filter((k2) => k2.startsWith('spec:')).forEach((k2) => { const v = get(k2); if (v) specs[k2.slice(5)] = v; });
-        rows.push({ n: hi + 2 + k, raw: { code: get('code'), title: get('title'), brand: get('brand'), category: get('category'), description: get('description'), mrp: get('mrp'), price: get('price'), gst: get('gst'), material: get('material'), color: get('color'), returnable: get('returnable'), care: get('care'), pack: get('pack'), stock: get('stock'), stocks, specs, img: [get('img1'), get('img2'), get('img3')] } }); });
+        rows.push({ n: hi + 2 + k, raw: { code: get('code'), title: get('title'), brand: get('brand'), category: get('category'), description: get('description'), mrp: get('mrp'), price: get('price'), gst: get('gst'), material: get('material'), color: get('color'), returnable: get('returnable'), care: get('care'), pack: get('pack'), stock: get('stock'), stocks, specs, links, img: [get('img1'), get('img2'), get('img3')] } }); });
       out.push({ type: t, name: sh.name, rows, missing: ['title', 'category', 'mrp', 'price', 'img1'].filter((k) => !(k in map)) }); });
     return out;
   }
@@ -105,14 +109,15 @@
         else { const q = num(raw.stock); if (!(Number.isInteger(q) && q >= 0)) err.push('Stock must be a whole number (0 or more).'); else variants.push({ size: raw.pack || null, color: raw.color || null, stock: q }); if (raw.pack.length > 20) err.push('Pack size / weight is too long (max 20 characters).'); }
         const names = raw.img.filter(Boolean); if (!raw.img[0]) err.push('Image 1 (main photo) is required.');
         const files = []; names.forEach((nm) => { if (/^https?:\/\//i.test(nm)) { err.push('Photo links are not supported - type the file name and add the photo file below.'); return; } const f = ctx.files.get(nm.split(/[\\/]/).pop().trim().toLowerCase()); if (!f) err.push(`Photo "${nm}" was not added yet.`); else files.push(f); });
+        const ext = []; Object.entries(raw.links || {}).forEach(([id, u]) => { const m = ctx.mk.get(id), er = Mkt.check(u, m); if (er) err.push((m ? m.name : id) + ' link: ' + er); else ext.push({ m: id, url: u }); }); if (ext.length > 4) err.push('At most 4 marketplace links per product.');
         const specs = Object.assign({}, raw.specs); if (raw.brand && !brand) specs.Brand = raw.brand;
-        Object.assign(p, { errors: err, warnings: warn, ok: !err.length, data: { title: raw.title, category_id: cat && cat.id, brand_id: brand && brand.id, description: raw.description || null, base_price: price, original_price: mrp, tax_rate: gst, material: raw.material || null, care_instructions: raw.care || null, is_returnable: ret !== false, specifications: specs, code: raw.code, variants, files } }); res.push(p); }); });
+        Object.assign(p, { errors: err, warnings: warn, ok: !err.length, data: { title: raw.title, category_id: cat && cat.id, brand_id: brand && brand.id, description: raw.description || null, base_price: price, original_price: mrp, tax_rate: gst, material: raw.material || null, care_instructions: raw.care || null, is_returnable: ret !== false, specifications: specs, external_links: ext.slice(0, 4), code: raw.code, variants, files } }); res.push(p); }); });
     return res;
   }
   async function context() {
     const [cats, brands] = await Promise.all([getCats(), getBrands()]), labels = catLabels(cats), catMap = new Map(), count = {};
     labels.forEach((c) => { count[norm(c.name)] = (count[norm(c.name)] || 0) + 1; }); labels.forEach((c) => { catMap.set(norm(c.label), c); if (count[norm(c.name)] === 1) catMap.set(norm(c.name), c); catMap.set(norm(c.slug), c); });
-    return { catMap, brandMap: new Map(brands.map((b) => [norm(b.name), b])), files: BK.files };
+    return { catMap, brandMap: new Map(brands.map((b) => [norm(b.name), b])), files: BK.files, mk: await Mkt.map() };
   }
 
   /* ---------- photos ---------- */
@@ -129,7 +134,7 @@
   /* ---------- creating the products ---------- */
   async function createOne(r, submit) {
     const d = r.data, pre = S.seller.id.replace(/-/g, '').slice(0, 4).toUpperCase(), base = (d.code ? d.code.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) : '') || rnd(6);
-    const { data: prod, error } = await window.sb.from('products').insert({ seller_id: S.seller.id, category_id: d.category_id, brand_id: d.brand_id, title: d.title, slug: slugify(d.title) + '-' + Math.random().toString(36).slice(2, 8), description: d.description, base_price: d.base_price, original_price: d.original_price, tax_rate: d.tax_rate, material: d.material, care_instructions: d.care_instructions, is_returnable: d.is_returnable, specifications: d.specifications, approval_status: 'draft' }).select('id').single();
+    const { data: prod, error } = await window.sb.from('products').insert({ seller_id: S.seller.id, category_id: d.category_id, brand_id: d.brand_id, title: d.title, slug: slugify(d.title) + '-' + Math.random().toString(36).slice(2, 8), description: d.description, base_price: d.base_price, original_price: d.original_price, tax_rate: d.tax_rate, material: d.material, care_instructions: d.care_instructions, is_returnable: d.is_returnable, specifications: d.specifications, external_links: d.external_links, approval_status: 'draft' }).select('id').single();
     if (error) throw error; const pid = prod.id, uploaded = [];
     const undo = async () => { if (uploaded.length) await window.sb.storage.from('product-images').remove(uploaded).catch(() => {}); await window.sb.from('products').delete().eq('id', pid); };
     try {
@@ -172,7 +177,7 @@
   }
   async function loadSheet(file) { BK.sheetName = file.name; BK.parsedFile = file; await reparse(); }
   async function reparse() {
-    if (!BK.parsedFile) return; try { const sheets = await XlsxLite.read(BK.parsedFile); BK.parsed = parseSheets(sheets, BK.csvType); if (!BK.parsed.some((s) => s.rows.length || s.headError)) { BK.results = []; draw(); return toast('No products found in this file. Use the template and fill at least one row.', 'error'); } }
+    if (!BK.parsedFile) return; try { const sheets = await XlsxLite.read(BK.parsedFile); BK.parsed = parseSheets(sheets, BK.csvType, await Mkt.list()); if (!BK.parsed.some((s) => s.rows.length || s.headError)) { BK.results = []; draw(); return toast('No products found in this file. Use the template and fill at least one row.', 'error'); } }
     catch (e) { BK.results = []; draw(); return toast(e.message || 'Could not read this file', 'error'); }
     BK.finished = false; revalidate();
   }
@@ -180,7 +185,7 @@
 
   Object.assign(A, {
     bkTemplate: async (b) => { btnBusy(b, true, 'Preparing…'); try { await downloadTemplate([...BK.sel]); } catch (e) { toast(errMsg(e, 'Could not create the template'), 'error'); } btnBusy(b, false); },
-    bkCsv: async () => { const t = TYPES.find((x) => x.id === [...BK.sel][0]), sh = sheetFor(t, 1); save(new Blob([XlsxLite.toCsv([sh.rows[0].map((c) => c.v), sh.rows[1].map((c) => (c.v === undefined || c.v === null ? '' : c.v))])], { type: 'text/csv' }), 'bulk-template-' + t.id + '.csv'); BK.csvType = t.id; toast('CSV template downloaded. Categories: type the category name exactly as on your website.'); },
+    bkCsv: async () => { const t = TYPES.find((x) => x.id === [...BK.sel][0]), sh = sheetFor(t, 1, await Mkt.list()); save(new Blob([XlsxLite.toCsv([sh.rows[0].map((c) => c.v), sh.rows[1].map((c) => (c.v === undefined || c.v === null ? '' : c.v))])], { type: 'text/csv' }), 'bulk-template-' + t.id + '.csv'); BK.csvType = t.id; toast('CSV template downloaded. Categories: type the category name exactly as on your website.'); },
     bkClearImg: () => { BK.files.clear(); revalidate(); },
     bkGo: () => runUpload(BK.submit),
     bkReport: () => { const rows = [['Row', 'Sheet', 'Product', 'Problems']].concat(BK.results.filter((r) => !r.ok || r.state === 'failed').map((r) => [r.n, r.sheet, r.title, (r.state === 'failed' ? r.fail : r.errors.join(' | '))])); save(new Blob([XlsxLite.toCsv(rows)], { type: 'text/csv' }), 'bulk-upload-problems.csv'); },

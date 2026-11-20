@@ -483,3 +483,20 @@ NOTES: use only songs you own or have a licence for. Songs are streamed from you
   Up to 200 products per upload. A product that fails (for example a network problem) is rolled back completely and listed with the reason.
   The yellow EXAMPLE row in the template is skipped automatically.
   New files: assets/js/bulk.js, assets/js/xlsx-lite.js, assets/vendor/jszip.min.js (JSZip, MIT licence).
+
+
+==============================================================
+  UPDATE v16: MARKETPLACE POSTERS + LINKS (Amazon, Flipkart, Meesho ...)
+==============================================================
+1) RUN database/migration_v16.sql ONCE (Supabase > SQL Editor).
+2) ADMIN > Marketplaces (new tab): for each marketplace (Amazon, Flipkart, Meesho, Myntra, Ajio, Nykaa, Snapdeal, JioMart are ready) upload the
+   POSTER picture (about 110 x 34 px, PNG/JPG/WebP - only pictures you may use) and check the allowed web addresses (for example amazon.in, amzn.to).
+   You can add more marketplaces, reorder, hide or delete them. Press Save changes. Without a poster a plain text button is shown.
+3) SELLER > Add / Edit product: new box "Also sold on other marketplaces" - up to 4 rows: choose the marketplace and paste the product link.
+   BULK UPLOAD: the template now has "Link - Amazon", "Link - Flipkart", ... columns (one per active marketplace).
+4) CUSTOMERS see the posters directly under the price ("Also available on"); a click opens the link in a new tab. Links are marked as sponsored
+   (rel=sponsored nofollow) and a short note says that a commission may be earned.
+5) SELLER > Orders: every incoming order shows the marketplace links of that product (if the seller added them).
+SAFETY: a link is accepted only if it starts with https:// and its web address belongs to the chosen marketplace (no "amazon.in@evil.com",
+  no look-alike domains, no ports). This is enforced in the database too. If a LIVE product's links are changed it goes back for review
+  (when "require re-approval" is on), exactly like a price change.
